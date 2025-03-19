@@ -78,4 +78,26 @@ question = st.text_input("Введите ваш вопрос:")
 # Кнопка отправки
 if st.button("Отправить"):
     if "model" not in locals():
-        model = crea
+        model = create_model(layers, activation)  # Создаём модель, если её нет
+    
+    # Преобразуем вопрос в числовой формат (просто заменяем символы на их ASCII-коды)
+    input_data = np.array([[ord(c) for c in question[:10].ljust(10)]])  # Ограничение 10 символов
+
+    # Проверяем, есть ли этот вопрос в истории
+    existing_answer = next((entry["answer"] for entry in chat_history if entry["question"] == question), None)
+
+    if existing_answer:
+        response = existing_answer  # Если уже есть в истории, возвращаем старый ответ
+    else:
+        response = model.predict(input_data)[0][0]  # Генерируем новый ответ
+        chat_history.append({"question": question, "answer": str(response)})  # Сохраняем новый вопрос-ответ
+        save_data(chat_history)  # Записываем в файл
+
+    st.write(f"Ответ: {response}")
+
+# Выводим историю диалога
+st.subheader("История диалога:")
+for entry in chat_history[-5:]:  # Показываем последние 5 сообщений
+    st.write(f"**Q:** {entry['question']}")
+    st.write(f"**A:** {entry['answer']}")
+    st.write("---")
