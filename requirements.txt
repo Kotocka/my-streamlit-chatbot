@@ -1,7 +1,6 @@
 streamlit
-tensorflow
+torch
+transformers
 numpy
 networkx
 matplotlib
-transformers
-torch
