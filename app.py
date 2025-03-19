@@ -45,4 +45,37 @@ def create_model(layer_sizes, activation):
     for size in layer_sizes[1:]:
         model.add(keras.layers.Dense(size, activation=activation))  # Скрытые слои
     model.add(keras.layers.Dense(1, activation="sigmoid"))  # Выходной слой
-    model.compile(opti
+    model.compile(optimizer="adam", loss="binary_crossentropy")
+    return model
+
+st.title("Диалоговая нейросеть")
+
+# Настройки нейросети
+st.sidebar.header("Настройки нейросети")
+
+# Ввод количества слоев
+layers = st.sidebar.text_input("Введите слои (например, 10,20,10):", "10,20,10")
+layers = list(map(int, layers.split(",")))
+
+# Выбор функции активации
+activation = st.sidebar.selectbox("Функция активации", ["relu", "sigmoid", "tanh"])
+
+# Количество эпох
+epochs = st.sidebar.slider("Количество эпох", 1, 20, 5)
+
+# Кнопка для обновления модели
+if st.sidebar.button("Обновить нейросеть"):
+    model = create_model(layers, activation)
+    visualize_nn(layers)
+    st.sidebar.write("✅ Нейросеть обновлена!")
+
+# Загружаем историю вопросов
+chat_history = load_data()
+
+# Поле ввода текста
+question = st.text_input("Введите ваш вопрос:")
+
+# Кнопка отправки
+if st.button("Отправить"):
+    if "model" not in locals():
+        model = crea
