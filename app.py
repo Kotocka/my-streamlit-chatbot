@@ -4,6 +4,22 @@ from tensorflow import keras
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+import json
+import os
+
+# Файл, где хранятся данные для обучения
+DATA_FILE = "chat_memory.json"
+
+# Функция для загрузки/сохранения данных
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
 
 # Функция для визуализации структуры нейросети
 def visualize_nn(layers):
@@ -29,37 +45,4 @@ def create_model(layer_sizes, activation):
     for size in layer_sizes[1:]:
         model.add(keras.layers.Dense(size, activation=activation))  # Скрытые слои
     model.add(keras.layers.Dense(1, activation="sigmoid"))  # Выходной слой
-    model.compile(optimizer="adam", loss="binary_crossentropy")
-    return model
-
-st.title("Диалоговая нейросеть")
-
-# Настройки нейросети
-st.sidebar.header("Настройки нейросети")
-
-# Ввод количества слоев
-layers = st.sidebar.text_input("Введите слои (например, 10,20,10):", "10,20,10")
-layers = list(map(int, layers.split(",")))
-
-# Выбор функции активации
-activation = st.sidebar.selectbox("Функция активации", ["relu", "sigmoid", "tanh"])
-
-# Количество эпох
-epochs = st.sidebar.slider("Количество эпох", 1, 20, 5)
-
-# Кнопка для обновления модели
-if st.sidebar.button("Обновить нейросеть"):
-    model = create_model(layers, activation)
-    visualize_nn(layers)
-    st.sidebar.write("✅ Нейросеть обновлена!")
-
-# Поле ввода текста
-question = st.text_input("Введите ваш вопрос:")
-
-# Кнопка отправки
-if st.button("Отправить"):
-    if "model" not in locals():
-        model = create_model(layers, activation)  # Создаём модель, если её нет
-    input_data = np.random.rand(1, 10)  # Генерируем случайный вектор
-    response = model.predict(input_data)[0][0]  # Прогоняем через нейросеть
-    st.write(f"Ответ: {response:.4f}")
+    model.compile(opti
