@@ -21,8 +21,15 @@ def save_data(data):
         json.dump(data, f)
 
 # Функция для визуализации структуры нейросети
-def visualize_nn(layers):
+def visualize_nn(model):
     G = nx.DiGraph()
+
+    layers = []
+    for i, (name, param) in enumerate(model.named_parameters()):
+        if "weight" in name:
+            layers.append(param.shape[0])  # Количество нейронов в слое
+
+    # Создание узлов и связей между слоями
     for i, neurons in enumerate(layers):
         for j in range(neurons):
             G.add_node(f"L{i}_N{j}", layer=i)
@@ -32,9 +39,9 @@ def visualize_nn(layers):
                     G.add_edge(f"L{i-1}_N{prev}", f"L{i}_N{curr}")
 
     pos = nx.multipartite_layout(G, subset_key="layer")
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 6))
     nx.draw(G, pos, with_labels=False, node_size=300, edge_color='gray')
-    plt.title("Структура нейросети")
+    plt.title("🧠 Структура нейросети")
     st.pyplot(plt)
 
 # Загружаем предобученную модель GPT-2
@@ -46,7 +53,7 @@ def load_gpt2():
 
 tokenizer, model = load_gpt2()
 
-st.title("🧠 Диалоговая нейросеть с обучением")
+st.title("🤖 Диалоговая нейросеть с интерактивной визуализацией")
 
 # Загружаем историю чата
 chat_history = load_data()
@@ -71,11 +78,15 @@ if st.button("Отправить"):
         chat_history.append({"question": question, "answer": response})
         save_data(chat_history)
 
-    st.write(f"🤖 **Ответ:** {response}")
+    st.write(f"🧠 **Ответ:** {response}")
 
 # Выводим историю диалога
-st.subheader("История диалога:")
+st.subheader("📝 История диалога:")
 for entry in chat_history[-5:]:  # Показываем последние 5 сообщений
     st.write(f"**Q:** {entry['question']}")
     st.write(f"**A:** {entry['answer']}")
     st.write("---")
+
+# Визуализация структуры нейросети
+st.subheader("🕸️ Визуализация нейросети:")
+visualize_nn(model)
