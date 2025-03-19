@@ -1,16 +1,15 @@
 import streamlit as st
-import tensorflow as tf
-from tensorflow import keras
-import numpy as np
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import networkx as nx
 import matplotlib.pyplot as plt
 import json
 import os
 
-# Файл, где хранятся данные для обучения
+# Файл, где хранятся данные для обучения (память чата)
 DATA_FILE = "chat_memory.json"
 
-# Функция для загрузки/сохранения данных
+# Функция для загрузки/сохранения данных чата
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -38,38 +37,18 @@ def visualize_nn(layers):
     plt.title("Структура нейросети")
     st.pyplot(plt)
 
-# Создание модели
-def create_model(layer_sizes, activation):
-    model = keras.Sequential()
-    model.add(keras.layers.Dense(layer_sizes[0], activation=activation, input_shape=(10,)))  # Входной слой
-    for size in layer_sizes[1:]:
-        model.add(keras.layers.Dense(size, activation=activation))  # Скрытые слои
-    model.add(keras.layers.Dense(1, activation="sigmoid"))  # Выходной слой
-    model.compile(optimizer="adam", loss="binary_crossentropy")
-    return model
+# Загружаем предобученную модель GPT-2
+@st.cache_resource
+def load_gpt2():
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
+    model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
+    return tokenizer, model
 
-st.title("Диалоговая нейросеть")
+tokenizer, model = load_gpt2()
 
-# Настройки нейросети
-st.sidebar.header("Настройки нейросети")
+st.title("🧠 Диалоговая нейросеть с обучением")
 
-# Ввод количества слоев
-layers = st.sidebar.text_input("Введите слои (например, 10,20,10):", "10,20,10")
-layers = list(map(int, layers.split(",")))
-
-# Выбор функции активации
-activation = st.sidebar.selectbox("Функция активации", ["relu", "sigmoid", "tanh"])
-
-# Количество эпох
-epochs = st.sidebar.slider("Количество эпох", 1, 20, 5)
-
-# Кнопка для обновления модели
-if st.sidebar.button("Обновить нейросеть"):
-    model = create_model(layers, activation)
-    visualize_nn(layers)
-    st.sidebar.write("✅ Нейросеть обновлена!")
-
-# Загружаем историю вопросов
+# Загружаем историю чата
 chat_history = load_data()
 
 # Поле ввода текста
@@ -77,23 +56,22 @@ question = st.text_input("Введите ваш вопрос:")
 
 # Кнопка отправки
 if st.button("Отправить"):
-    if "model" not in locals():
-        model = create_model(layers, activation)  # Создаём модель, если её нет
-    
-    # Преобразуем вопрос в числовой формат (просто заменяем символы на их ASCII-коды)
-    input_data = np.array([[ord(c) for c in question[:10].ljust(10)]])  # Ограничение 10 символов
-
     # Проверяем, есть ли этот вопрос в истории
     existing_answer = next((entry["answer"] for entry in chat_history if entry["question"] == question), None)
 
     if existing_answer:
-        response = existing_answer  # Если уже есть в истории, возвращаем старый ответ
+        response = existing_answer  # Если вопрос уже был, используем старый ответ
     else:
-        response = model.predict(input_data)[0][0]  # Генерируем новый ответ
-        chat_history.append({"question": question, "answer": str(response)})  # Сохраняем новый вопрос-ответ
-        save_data(chat_history)  # Записываем в файл
+        # Генерируем новый ответ с помощью GPT-2
+        inputs = tokenizer.encode(question + tokenizer.eos_token, return_tensors="pt")
+        response_ids = model.generate(inputs, max_length=100, pad_token_id=tokenizer.eos_token_id)
+        response = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
 
-    st.write(f"Ответ: {response}")
+        # Запоминаем новый ответ
+        chat_history.append({"question": question, "answer": response})
+        save_data(chat_history)
+
+    st.write(f"🤖 **Ответ:** {response}")
 
 # Выводим историю диалога
 st.subheader("История диалога:")
