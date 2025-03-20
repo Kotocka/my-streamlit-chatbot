@@ -73,28 +73,39 @@ chat_history = load_chat_history()
 question = st.text_input("")
 
 if st.button("Отправить"):
-    # Формируем контекст из истории диалога
-    history_text = "\n".join([f"Пользователь: {entry['question']}\nБот: {entry['answer']}" for entry in chat_history[-7:]])
-    input_text = f"{history_text}\nПользователь: {question}\nБот:"
+    if not question.strip():
+        st.warning("❌ Вопрос не может быть пустым!")
+    else:
+        # Формируем контекст, но ограничиваем его до 1000 символов
+        history_text = "\n".join([f"Пользователь: {entry['question']}\nБот: {entry['answer']}" for entry in chat_history[-5:]])
+        input_text = f"{history_text}\nПользователь: {question}\nБот:"
+        input_text = input_text[-1000:]  # Обрезаем слишком длинный контекст
 
-    # Генерация ответа с контекстом
-    inputs = tokenizer.encode(input_text, return_tensors="pt")
-    response_ids = model.generate(inputs, max_length=150, pad_token_id=tokenizer.eos_token_id)
-    response = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
+        # Преобразуем текст в токены
+        inputs = tokenizer.encode(input_text, return_tensors="pt")
 
-    # Если ответ пустой — генерируем заново
-    if response.strip() == "":
-        response = "Я пока не знаю, что сказать. Попробуйте задать вопрос иначе!"
+        # Определяем максимальную длину ответа (но не превышаем лимиты модели)
+        max_response_length = min(100, model.config.max_length - inputs.shape[1])
 
-    # Сохраняем историю
-    chat_history.append({"question": question, "answer": response})
-    save_chat_history(chat_history)
+        try:
+            response_ids = model.generate(inputs, max_length=max_response_length, pad_token_id=tokenizer.eos_token_id)
+            response = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
+        except ValueError:
+            response = "❌ Ошибка генерации! Попробуйте другой вопрос."
 
-    st.write(f"🤖 **Ответ:** {response}")
+        # Если ответ пустой — даём заглушку
+        if not response.strip():
+            response = "Я пока не знаю, что сказать. Попробуйте задать вопрос иначе!"
+
+        # Сохраняем историю
+        chat_history.append({"question": question, "answer": response})
+        save_chat_history(chat_history)
+
+        st.write(f"🤖 **Ответ:** {response}")
 
 # ВЫВОДИМ ИСТОРИЮ ЧАТА
 st.subheader("📜 История диалога:")
-for entry in chat_history[-7:]:  # Показываем последние 7 сообщений
+for entry in chat_history[-5:]:  # Показываем последние 5 сообщений
     st.write(f"**Пользователь:** {entry['question']}")
     st.write(f"**Бот:** {entry['answer']}")
     st.write("---")
