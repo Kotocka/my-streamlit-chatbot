@@ -77,9 +77,8 @@ if st.button("📩 Отправить"):
         st.warning("❌ Вопрос не может быть пустым!")
     else:
         # Оставляем последние 3 сообщения (уменьшаем контекст)
-        history_text = "\n".join([f"Пользователь: {entry['question']}\nБот: {entry['answer']}" for entry in chat_history[-3:]])
-        input_text = f"{history_text}\nПользователь: {question}\nБот:"
-        input_text = input_text[-500:]  # Обрезаем слишком длинный контекст
+        history_text = " ".join([f"Пользователь: {entry['question']} Бот: {entry['answer']}" for entry in chat_history[-3:]])
+        input_text = f"{history_text} Пользователь: {question} Бот:" + tokenizer.eos_token  # Завершаем EOS-токеном
 
         # Преобразуем текст в токены
         inputs = tokenizer.encode(input_text, return_tensors="pt")
@@ -92,7 +91,7 @@ if st.button("📩 Отправить"):
                 max_length=min(100, inputs.shape[1] + max_response_length),  
                 pad_token_id=tokenizer.eos_token_id,
                 do_sample=True,  
-                top_k=50,  
+                top_p=0.92,  # Более стабильный параметр вместо top_k
                 temperature=0.8  
             )
             response = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
