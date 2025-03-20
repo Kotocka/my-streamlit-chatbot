@@ -27,4 +27,4 @@ st.title("🤖 Умная диалоговая нейросеть")
 @st.cache_resource
 def load_model():
     tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small", cache_dir="./cache")
-    model
+    model = AutoModelFo
