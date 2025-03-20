@@ -76,22 +76,29 @@ if st.button("Отправить"):
     if not question.strip():
         st.warning("❌ Вопрос не может быть пустым!")
     else:
-        # Формируем контекст, но ограничиваем его до 1000 символов
-        history_text = "\n".join([f"Пользователь: {entry['question']}\nБот: {entry['answer']}" for entry in chat_history[-5:]])
+        # Ограничиваем историю диалога (чтобы не перегрузить модель)
+        history_text = "\n".join([f"Пользователь: {entry['question']}\nБот: {entry['answer']}" for entry in chat_history[-3:]])
         input_text = f"{history_text}\nПользователь: {question}\nБот:"
-        input_text = input_text[-1000:]  # Обрезаем слишком длинный контекст
+        input_text = input_text[-500:]  # Обрезаем слишком длинный контекст
 
         # Преобразуем текст в токены
         inputs = tokenizer.encode(input_text, return_tensors="pt")
+        attention_mask = torch.ones_like(inputs)
 
-        # Определяем максимальную длину ответа (но не превышаем лимиты модели)
-        max_response_length = min(100, model.config.max_length - inputs.shape[1])
+        # Определяем `max_length` динамически
+        max_input_length = inputs.shape[1]
+        max_response_length = min(50, model.config.max_length - max_input_length)
 
         try:
-            response_ids = model.generate(inputs, max_length=max_response_length, pad_token_id=tokenizer.eos_token_id)
+            response_ids = model.generate(
+                inputs, 
+                max_length=max_input_length + max_response_length,  
+                pad_token_id=tokenizer.eos_token_id,
+                attention_mask=attention_mask
+            )
             response = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
         except ValueError:
-            response = "❌ Ошибка генерации! Попробуйте другой вопрос."
+            response = "❌ Ошибка генерации! Попробуйте задать вопрос иначе."
 
         # Если ответ пустой — даём заглушку
         if not response.strip():
@@ -105,7 +112,7 @@ if st.button("Отправить"):
 
 # ВЫВОДИМ ИСТОРИЮ ЧАТА
 st.subheader("📜 История диалога:")
-for entry in chat_history[-5:]:  # Показываем последние 5 сообщений
+for entry in chat_history[-3:]:  # Показываем последние 3 сообщения
     st.write(f"**Пользователь:** {entry['question']}")
     st.write(f"**Бот:** {entry['answer']}")
     st.write("---")
