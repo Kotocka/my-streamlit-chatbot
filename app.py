@@ -27,4 +27,95 @@ st.title("🤖 Умная диалоговая нейросеть")
 @st.cache_resource
 def load_model():
     tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-small", cache_dir="./cache")
-    model = AutoModelFo
+    model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-small", cache_dir="./cache")
+    return tokenizer, model
+
+tokenizer, model = load_model()
+
+# **НАСТРОЙКИ НЕЙРОСЕТИ**
+st.sidebar.header("⚙️ Настройки нейросети")
+layers = st.sidebar.text_input("Слои (например, 10,20,10):", "10,20,10")
+layers = list(map(int, layers.split(",")))
+
+# Выбор функции активации (для визуализации)
+activation = st.sidebar.selectbox("Функция активации:", ["relu", "sigmoid", "tanh"])
+
+# Функция визуализации архитектуры сети
+def visualize_nn(layers):
+    G = nx.DiGraph()
+    
+    for i, neurons in enumerate(layers):
+        for j in range(neurons):
+            G.add_node(f"L{i}_N{j}", layer=i)
+        if i > 0:
+            for prev in range(layers[i-1]):
+                for curr in range(neurons):
+                    G.add_edge(f"L{i-1}_N{prev}", f"L{i}_N{curr}")
+
+    pos = nx.multipartite_layout(G, subset_key="layer")
+    plt.figure(figsize=(10, 6))
+    nx.draw(G, pos, with_labels=False, node_size=300, edge_color='gray')
+    plt.title(f"🧠 Архитектура нейросети (Функция активации: {activation})")
+    st.pyplot(plt)
+
+# **КНОПКА "Обновить нейросеть"**
+if st.sidebar.button("🔄 Обновить нейросеть"):
+    visualize_nn(layers)
+    st.sidebar.success("✅ Нейросеть обновлена!")
+
+# **ЧАТ-БОТ С ИСТОРИЕЙ**
+st.subheader("💬 Введите ваш вопрос:")
+
+# Загружаем историю чата
+chat_history = load_chat_history()
+
+# Поле ввода
+question = st.text_input("Введите текст здесь...")
+
+if st.button("📩 Отправить"):
+    if not question.strip():
+        st.warning("❌ Вопрос не может быть пустым!")
+    else:
+        # Оставляем последние 3 сообщения (уменьшаем контекст)
+        history_text = "\n".join([f"Пользователь: {entry['question']}\nБот: {entry['answer']}" for entry in chat_history[-3:]])
+        input_text = f"{history_text}\nПользователь: {question}\nБот:"
+        input_text = input_text[-500:]  # Обрезаем слишком длинный контекст
+
+        # Преобразуем текст в токены
+        inputs = tokenizer.encode(input_text, return_tensors="pt")
+
+        # Ограничиваем `max_length`
+        max_response_length = 50  
+        try:
+            response_ids = model.generate(
+                inputs, 
+                max_length=min(100, inputs.shape[1] + max_response_length),  
+                pad_token_id=tokenizer.eos_token_id,
+                do_sample=True,  
+                top_k=50,  
+                temperature=0.8  
+            )
+            response = tokenizer.decode(response_ids[:, inputs.shape[-1]:][0], skip_special_tokens=True)
+        except ValueError:
+            response = "❌ Ошибка генерации! Попробуйте задать вопрос иначе."
+
+        # Если ответ пустой — даём заглушку
+        if not response.strip():
+            response = "Я пока не знаю, что сказать. Попробуйте задать вопрос иначе!"
+
+        # Сохраняем историю
+        chat_history.append({"question": question, "answer": response})
+        save_chat_history(chat_history)
+
+        st.write(f"🤖 **Ответ:** {response}")
+
+# **ИСТОРИЯ ЧАТА**
+st.subheader("📜 История диалога:")
+for entry in chat_history[-3:]:  
+    st.write(f"**Пользователь:** {entry['question']}")
+    st.write(f"**Бот:** {entry['answer']}")
+    st.write("---")
+
+# **ВИЗУАЛИЗАЦИЯ СТРУКТУРЫ НЕЙРОСЕТИ**
+st.subheader("🕸️ Архитектура нейросети:")
+visualize_nn(layers)
